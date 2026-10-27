@@ -18,13 +18,16 @@ public class Note {
     private final String owner;
     private String encryptedText;
     private final LocalDateTime createdAt;
-    private final LocalDateTime expiresAt;
+    private LocalDateTime expiresAt;
+    private final int expiryMinutes;
     private LocalDateTime readAt;
     private int viewsLeft;
     private boolean burned;
+    private boolean approved;
+    private boolean rejected;
 
     /**
-     * Standard constructor: sets expiry time relative to creation time.
+     * Standard constructor: note starts PENDING; the expiry clock restarts when the admin approves it.
      */
     public Note(int id, String token, String owner, String text, int expiryMinutes, int views) {
         this.id = id;
@@ -32,6 +35,7 @@ public class Note {
         this.owner = owner;
         this.encryptedText = CryptoUtil.encryptAES(text != null ? text.trim() : "");
         this.createdAt = LocalDateTime.now();
+        this.expiryMinutes = expiryMinutes;
         this.expiresAt = this.createdAt.plusMinutes(expiryMinutes);
         this.readAt = null;
         this.viewsLeft = views;
@@ -40,6 +44,7 @@ public class Note {
 
     /**
      * Overloaded constructor: allows explicit timestamps (useful for simulating expired notes).
+     * Such notes are treated as already approved.
      */
     public Note(int id, String token, String owner, String text,
                 LocalDateTime createdAt, LocalDateTime expiresAt, int views) {
@@ -49,9 +54,37 @@ public class Note {
         this.encryptedText = CryptoUtil.encryptAES(text != null ? text.trim() : "");
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
+        this.expiryMinutes = (int) java.time.Duration.between(createdAt, expiresAt).toMinutes();
         this.readAt = null;
         this.viewsLeft = views;
         this.burned = false;
+        this.approved = true;
+    }
+
+    /** Admin releases the note: link goes live and the expiry clock starts now. */
+    public synchronized void approve() {
+        if (approved || rejected || burned) {
+            return;
+        }
+        this.approved = true;
+        this.expiresAt = LocalDateTime.now().plusMinutes(expiryMinutes);
+    }
+
+    /** Admin refuses delivery: ciphertext is purged and the link is dead. */
+    public synchronized void reject() {
+        if (approved || burned) {
+            return;
+        }
+        this.rejected = true;
+        this.encryptedText = null;
+    }
+
+    public synchronized boolean isPending() {
+        return !approved && !rejected && !burned;
+    }
+
+    public synchronized boolean isRejected() {
+        return rejected;
     }
 
     public int getId() {
@@ -82,7 +115,7 @@ public class Note {
         return viewsLeft;
     }
 
-    public boolean isBurned() {
+    public synchronized boolean isBurned() {
         return burned;
     }
 
@@ -90,13 +123,19 @@ public class Note {
         return LocalDateTime.now().isAfter(expiresAt);
     }
 
-    public boolean isReadable() {
-        return !burned && !isExpired() && viewsLeft > 0;
+    public synchronized boolean isReadable() {
+        return approved && !burned && !isExpired() && viewsLeft > 0;
     }
 
-    public NoteStatus getStatus() {
+    public synchronized NoteStatus getStatus() {
+        if (rejected) {
+            return NoteStatus.REJECTED;
+        }
         if (burned) {
             return NoteStatus.BURNED;
+        }
+        if (!approved) {
+            return NoteStatus.PENDING;
         }
         if (isExpired()) {
             return NoteStatus.EXPIRED;
@@ -125,7 +164,7 @@ public class Note {
      * Decrypts AES-256 ciphertext on-the-fly.
      * Burns the note and purges ciphertext from memory once view count reaches zero.
      */
-    public String read() {
+    public synchronized String read() {
         this.readAt = LocalDateTime.now();
         this.viewsLeft--;
         String decryptedSecret = CryptoUtil.decryptAES(this.encryptedText);
@@ -134,6 +173,15 @@ public class Note {
             this.encryptedText = null; // Purge ciphertext from RAM completely
         }
         return decryptedSecret;
+    }
+
+    /**
+     * Admin force-burn: purges the ciphertext without revealing it and kills the link.
+     */
+    public synchronized void burn() {
+        this.viewsLeft = 0;
+        this.burned = true;
+        this.encryptedText = null;
     }
 
     /**

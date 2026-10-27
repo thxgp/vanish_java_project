@@ -5,6 +5,7 @@ import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.NoteBurnedException;
 import com.vanish.exception.NoteExpiredException;
 import com.vanish.exception.NoteNotFoundException;
+import com.vanish.exception.NotePendingException;
 import com.vanish.exception.UserAlreadyExistsException;
 import com.vanish.model.Note;
 import com.vanish.model.User;
@@ -173,6 +174,7 @@ public class VanishCLI {
 
         try {
             Note note = noteService.createNote(currentUser.getUsername(), text, expiry, views);
+            note.approve(); // console phase has no admin; web (phase 4) routes approval through the admin
             System.out.println("[SUCCESS] Secret Note #" + note.getId() + " created!");
             System.out.println("  Secret Token : " + note.getToken());
             System.out.println("  Shareable Link: " + note.shareLink());
@@ -206,6 +208,8 @@ public class VanishCLI {
             System.out.println("[CAUGHT NoteBurnedException] " + e.getMessage());
         } catch (NoteExpiredException e) {
             System.out.println("[CAUGHT NoteExpiredException] " + e.getMessage());
+        } catch (NotePendingException e) {
+            System.out.println("[CAUGHT NotePendingException] " + e.getMessage());
         }
     }
 

@@ -5,6 +5,7 @@ import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.NoteBurnedException;
 import com.vanish.exception.NoteExpiredException;
 import com.vanish.exception.NoteNotFoundException;
+import com.vanish.exception.NotePendingException;
 import com.vanish.exception.UserAlreadyExistsException;
 import com.vanish.model.Note;
 import com.vanish.model.User;
@@ -78,6 +79,7 @@ public class VanishPhase2 {
                 + " length=" + (text == null ? 0 : text.length()));
         try {
             Note note = noteService.createNote(owner.getUsername(), text, expiryMinutes, views);
+            note.approve(); // console phase has no admin; web (phase 4) routes approval through the admin
             System.out.println("  [SUCCESS] Note #" + note.getId() + " created with token: " + note.getToken());
             System.out.println("  Link: " + note.shareLink());
             System.out.println("  AES-256 In-Memory Ciphertext: " + note.getCiphertextPreview());
@@ -100,6 +102,8 @@ public class VanishPhase2 {
             System.out.println("  [ERROR - NoteBurnedException] " + e.getMessage());
         } catch (NoteExpiredException e) {
             System.out.println("  [ERROR - NoteExpiredException] " + e.getMessage());
+        } catch (NotePendingException e) {
+            System.out.println("  [ERROR - NotePendingException] " + e.getMessage());
         }
     }
 

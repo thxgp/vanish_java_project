@@ -1,0 +1,57 @@
+<%@ page import="com.vanish.web.Html"%>
+<%-- Expects page vars: String adminTitle, String adminActive ("overview"|"approvals"|"users"|"notes"). --%>
+<%
+    String ctx = request.getContextPath();
+    com.vanish.model.User adminUser = (com.vanish.model.User) session.getAttribute("user");
+    String flashMsg = request.getParameter("msg");
+    String flashErr = request.getParameter("error");
+    int navPendingCount = new com.vanish.service.impl.AdminServiceImpl().listPendingNotes().size();
+%>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= Html.esc(adminTitle) %> — Vanish</title>
+  <link rel="stylesheet" href="<%= Html.esc(ctx) %>/css/style.css">
+  <script src="<%= Html.esc(ctx) %>/js/theme.js"></script>
+</head>
+<body>
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="<%= Html.esc(ctx) %>/index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+      <div class="nav-right">
+        <nav>
+          <ul class="nav-links">
+            <li><a href="<%= Html.esc(ctx) %>/admin" class="nav-link<%= "overview".equals(adminActive) ? " active" : "" %>">Admin</a></li>
+            <li><a href="<%= Html.esc(ctx) %>/admin/approvals" class="nav-link<%= "approvals".equals(adminActive) ? " active" : "" %>">Approvals<%= navPendingCount > 0 ? " (" + navPendingCount + ")" : "" %></a></li>
+            <li><a href="<%= Html.esc(ctx) %>/admin/users" class="nav-link<%= "users".equals(adminActive) ? " active" : "" %>">Users</a></li>
+            <li><a href="<%= Html.esc(ctx) %>/admin/notes" class="nav-link<%= "notes".equals(adminActive) ? " active" : "" %>">Notes</a></li>
+            <li>
+              <div class="user-badge">
+                <span class="user-avatar">👤</span>
+                <span><%= Html.esc(adminUser == null ? "" : adminUser.getUsername()) %></span>
+              </div>
+            </li>
+            <li>
+              <form action="<%= Html.esc(ctx) %>/logout" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-secondary btn-sm">Sign Out</button>
+              </form>
+            </li>
+          </ul>
+        </nav>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3.5rem; flex: 1;">
+    <% if (flashMsg != null && !flashMsg.isEmpty()) { %>
+      <div class="alert alert-success" style="margin-bottom: 1.5rem;"><%= Html.esc(flashMsg) %></div>
+    <% } %>
+    <% if (flashErr != null && !flashErr.isEmpty()) { %>
+      <div class="alert alert-danger" style="margin-bottom: 1.5rem;"><%= Html.esc(flashErr) %></div>
+    <% } %>

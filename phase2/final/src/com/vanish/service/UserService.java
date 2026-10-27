@@ -25,6 +25,15 @@ public interface UserService {
             throws InvalidInputException, UserAlreadyExistsException;
 
     /**
+     * Registers an account with the ADMIN role. Used only for startup seeding, never from a public form.
+     *
+     * @throws InvalidInputException      if username or password fail validation rules
+     * @throws UserAlreadyExistsException  if the username is already registered
+     */
+    User registerAdmin(String username, String password)
+            throws InvalidInputException, UserAlreadyExistsException;
+
+    /**
      * Authenticates an existing user with username and password.
      *
      * @param username user's username

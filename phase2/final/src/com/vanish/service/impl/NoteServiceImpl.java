@@ -4,6 +4,8 @@ import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.NoteBurnedException;
 import com.vanish.exception.NoteExpiredException;
 import com.vanish.exception.NoteNotFoundException;
+import com.vanish.exception.NotePendingException;
+import com.vanish.model.User;
 import com.vanish.model.Note;
 import com.vanish.service.NoteService;
 import com.vanish.store.MemoryStore;
@@ -44,6 +46,11 @@ public class NoteServiceImpl implements NoteService {
         String token = TokenGenerator.generateToken();
 
         Note note = new Note(id, token, ownerUsername.trim(), secretText, expiryMinutes, views);
+        // Admin is the middleman for everyone else; his own notes need no approval.
+        User owner = store.findUserByUsername(ownerUsername);
+        if (owner != null && owner.isAdmin()) {
+            note.approve();
+        }
         store.saveNote(note);
         return note;
     }
@@ -69,7 +76,7 @@ public class NoteServiceImpl implements NoteService {
 
     @Override
     public String readNote(String token)
-            throws NoteNotFoundException, NoteBurnedException, NoteExpiredException {
+            throws NoteNotFoundException, NoteBurnedException, NoteExpiredException, NotePendingException {
 
         if (token == null || token.trim().isEmpty()) {
             throw new NoteNotFoundException("Invalid or empty link token.");
@@ -80,16 +87,27 @@ public class NoteServiceImpl implements NoteService {
             throw new NoteNotFoundException("No note found with token: " + token);
         }
 
-        if (note.isBurned()) {
-            throw new NoteBurnedException("This secret note has already been read and burned.");
-        }
+        // Check and read atomically so concurrent hits cannot both pass a 1-view note.
+        synchronized (note) {
+            if (note.isRejected()) {
+                throw new NoteBurnedException("This secret note was rejected by the admin and destroyed.");
+            }
 
-        if (note.isExpired()) {
-            throw new NoteExpiredException("This secret note has expired.");
-        }
+            if (note.isBurned()) {
+                throw new NoteBurnedException("This secret note has already been read and burned.");
+            }
 
-        // Return secret text and burn if views exhausted
-        return note.read();
+            if (note.isPending()) {
+                throw new NotePendingException("This secret note is waiting for admin approval. Try again later.");
+            }
+
+            if (note.isExpired()) {
+                throw new NoteExpiredException("This secret note has expired.");
+            }
+
+            // Return secret text and burn if views exhausted
+            return note.read();
+        }
     }
 
     @Override

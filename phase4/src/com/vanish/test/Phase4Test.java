@@ -1,5 +1,7 @@
 package com.vanish.test;
 
+import com.vanish.exception.NotePendingException;
+import com.vanish.exception.UserAlreadyExistsException;
 import com.vanish.exception.AuthenticationException;
 import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.NoteBurnedException;
@@ -8,8 +10,10 @@ import com.vanish.exception.NoteNotFoundException;
 import com.vanish.model.Note;
 import com.vanish.model.NoteStatus;
 import com.vanish.model.User;
+import com.vanish.service.AdminService;
 import com.vanish.service.NoteService;
 import com.vanish.service.UserService;
+import com.vanish.service.impl.AdminServiceImpl;
 import com.vanish.service.impl.NoteServiceImpl;
 import com.vanish.service.impl.UserServiceImpl;
 import com.vanish.store.MemoryStore;
@@ -119,7 +123,33 @@ public class Phase4Test {
         System.out.println("\n--- Test Group 5: Dashboard Notes Ledger (JSP Data Source) ---");
         List<Note> dashboardNotes = noteService.getNotesByOwner("student");
         test("Dashboard retrieves user notes", dashboardNotes.size() == 1);
-        test("Initial note status is UNREAD", dashboardNotes.get(0).getStatus() == NoteStatus.UNREAD);
+        test("New note starts PENDING admin approval", dashboardNotes.get(0).getStatus() == NoteStatus.PENDING);
+
+        // 5b. Admin middleman approval
+        System.out.println("\n--- Test Group 5b: Admin Middleman Approval ---");
+        try {
+            noteService.readNote(note1.getToken());
+            test("Pending note cannot be read", false);
+        } catch (NotePendingException e) {
+            test("Pending note cannot be read (NotePendingException)", true);
+        } catch (Exception e) {
+            test("Pending note cannot be read", false);
+        }
+        test("Opening a pending link burns nothing", note1.getViewsLeft() == 1 && !note1.isBurned());
+        try {
+            new AdminServiceImpl().approveNote(note1.getToken());
+            test("Admin approval makes note live (UNREAD)", note1.getStatus() == NoteStatus.UNREAD);
+        } catch (Exception e) {
+            test("Admin approval makes note live (UNREAD)", false);
+        }
+        try {
+            new AdminServiceImpl().approveNote(note1.getToken());
+            test("Approving a non-pending note is rejected", false);
+        } catch (InvalidInputException e) {
+            test("Approving a non-pending note is rejected", true);
+        } catch (Exception e) {
+            test("Approving a non-pending note is rejected", false);
+        }
 
         // 6. Burn-On-Read Server-Side Execution
         System.out.println("\n--- Test Group 6: Burn-On-Read Secret Retrieval & Destruction ---");
@@ -179,6 +209,99 @@ public class Phase4Test {
         System.out.println("\n--- Test Group 10: Logout & Session Invalidation ---");
         sessionUser = null; // Simulating session.invalidate()
         test("Session invalidation purges user session context", sessionUser == null);
+
+        // 11. Admin panel
+        System.out.println("\n--- Test Group 11: Admin Panel (roles, moderation, privacy) ---");
+        AdminService adminService = new AdminServiceImpl();
+        User admin = null;
+        try {
+            admin = userService.registerAdmin("admin", "Admin@12345");
+            test("Seeded admin has ADMIN role", admin.isAdmin());
+            test("Normal registration yields USER role", !student.isAdmin());
+        } catch (Exception e) {
+            test("Seed admin account", false);
+        }
+
+        try {
+            userService.registerAdmin("admin", "Admin@12345");
+            test("Duplicate admin username rejected", false);
+        } catch (UserAlreadyExistsException e) {
+            test("Duplicate admin username rejected", true);
+        } catch (Exception e) {
+            test("Duplicate admin username rejected", false);
+        }
+
+        try {
+            Note unread = noteService.createNote("student", "AdminMustNotSeeThis-777", 10, 1);
+            Note toBurn = noteService.createNote("student", "BurnMe-888", 10, 3);
+            AdminService.Stats st = adminService.getStats();
+            test("Stats count users", st.users() == 2);
+            test("Stats split notes by status", st.burned() == 1 && st.expired() == 1 && st.pending() == 2 && st.unread() == 0 && st.notes() == 4);
+            test("Approval queue lists pending notes", adminService.listPendingNotes().size() == 2);
+
+            Note spam = noteService.createNote("student", "Rejected-999", 10, 1);
+            adminService.rejectNote(spam.getToken());
+            test("Admin reject purges ciphertext and marks REJECTED",
+                    spam.getStatus() == NoteStatus.REJECTED && spam.getCiphertextPreview().contains("PURGED"));
+            try {
+                noteService.readNote(spam.getToken());
+                test("Rejected link is dead", false);
+            } catch (NoteBurnedException e) {
+                test("Rejected link is dead", e.getMessage().contains("rejected"));
+            }
+            adminService.deleteNote(spam.getToken());
+
+            Note adminOwn = noteService.createNote("admin", "AdminOwnNote", 10, 1);
+            test("Admin's own note skips approval", adminOwn.getStatus() == NoteStatus.UNREAD);
+            adminService.deleteNote(adminOwn.getToken());
+
+            adminService.burnNote(toBurn.getToken());
+            test("Admin burn purges ciphertext and marks BURNED",
+                    toBurn.getStatus() == NoteStatus.BURNED && toBurn.getCiphertextPreview().contains("PURGED"));
+            try {
+                noteService.readNote(toBurn.getToken());
+                test("Admin-burned link is dead", false);
+            } catch (NoteBurnedException e) {
+                test("Admin-burned link is dead", true);
+            }
+
+            boolean leaks = false;
+            for (Note n : adminService.listNotes()) {
+                leaks |= n.dashboardRow().contains("AdminMustNotSeeThis") || n.getCiphertextPreview().contains("AdminMustNotSeeThis");
+            }
+            test("Admin note views never expose secret text", !leaks);
+
+            adminService.deleteNote(unread.getToken());
+            test("Admin delete removes note and its link", noteService.findNoteByToken(unread.getToken()) == null);
+        } catch (Exception e) {
+            test("Admin note moderation", false);
+        }
+
+        try {
+            adminService.deleteUser("admin");
+            test("Admin account cannot be deleted", false);
+        } catch (InvalidInputException e) {
+            test("Admin account cannot be deleted", true);
+        } catch (Exception e) {
+            test("Admin account cannot be deleted", false);
+        }
+
+        try {
+            adminService.deleteUser("student");
+            test("Deleting user removes the user", userService.findByUsername("student") == null);
+            test("Deleting user removes all their notes", adminService.listNotes().isEmpty());
+        } catch (Exception e) {
+            test("Admin delete user", false);
+        }
+
+        try {
+            adminService.deleteUser("ghostuser");
+            test("Deleting unknown user is rejected", false);
+        } catch (InvalidInputException e) {
+            test("Deleting unknown user is rejected", true);
+        } catch (Exception e) {
+            test("Deleting unknown user is rejected", false);
+        }
 
         // Summary
         System.out.println("\n===============================================================");

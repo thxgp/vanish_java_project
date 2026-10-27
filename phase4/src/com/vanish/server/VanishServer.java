@@ -8,6 +8,7 @@ import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.NoteBurnedException;
 import com.vanish.exception.NoteExpiredException;
 import com.vanish.exception.NoteNotFoundException;
+import com.vanish.exception.NotePendingException;
 import com.vanish.exception.UserAlreadyExistsException;
 import com.vanish.model.Note;
 import com.vanish.model.NoteStatus;
@@ -16,6 +17,9 @@ import com.vanish.service.NoteService;
 import com.vanish.service.UserService;
 import com.vanish.service.impl.NoteServiceImpl;
 import com.vanish.service.impl.UserServiceImpl;
+import com.vanish.service.AdminService;
+import com.vanish.service.impl.AdminServiceImpl;
+import com.vanish.util.AdminBootstrap;
 
 import java.io.*;
 import java.net.InetSocketAddress;
@@ -49,6 +53,7 @@ public class VanishServer {
     private static int activePort = 8080;
     private static final UserService userService = new UserServiceImpl();
     private static final NoteService noteService = new NoteServiceImpl();
+    private static final AdminService adminService = new AdminServiceImpl();
     private static final Map<String, SessionData> activeSessions = new ConcurrentHashMap<>();
 
     private static Path webRoot = Paths.get("web");
@@ -93,6 +98,7 @@ public class VanishServer {
             System.out.println("[BOOTSTRAP] Demo user 'student' loaded with notes: " + n1.getToken() + ", " + n2.getToken());
         } catch (Exception ignored) {
         }
+        AdminBootstrap.seed(userService);
 
         int targetPort = 8080;
         if (args.length > 0) {
@@ -125,6 +131,9 @@ public class VanishServer {
         System.out.println("   VANISH - Phase 4 Server Running (CLO1, CLO2, CLO3)");
         System.out.println("   Access Application at: http://localhost:" + activePort + "/");
         System.out.println("   Pre-configured account: student / JavaPass@123");
+        System.out.println("   Admin account: " + (System.getenv("VANISH_ADMIN_USER") == null && System.getenv("VANISH_ADMIN_PASSWORD") == null
+                ? "admin / Admin@12345 (default)"
+                : (System.getenv("VANISH_ADMIN_USER") != null ? System.getenv("VANISH_ADMIN_USER") : "admin") + " (password from VANISH_ADMIN_PASSWORD)"));
         System.out.println("   Web Root: " + webRoot.toAbsolutePath());
         System.out.println("==============================================================");
 
@@ -188,13 +197,15 @@ public class VanishServer {
                     serveFile(exchange, webRoot.resolve(path.substring(1)), "application/javascript");
                 } else if (path.startsWith("/json/")) {
                     serveFile(exchange, webRoot.resolve(path.substring(1)), "application/json");
+                } else if (path.equals("/admin") || path.startsWith("/admin/")) {
+                    handleAdmin(exchange, session, path, method);
                 } else {
                     Path file = webRoot.resolve(path.startsWith("/") ? path.substring(1) : path);
-                    if (Files.exists(file) && !Files.isDirectory(file)) {
+                    if (insideWebRoot(file) && Files.exists(file) && !Files.isDirectory(file)) {
                         String mime = Files.probeContentType(file);
                         serveFile(exchange, file, mime != null ? mime : "text/plain");
                     } else {
-                        sendResponse(exchange, 404, "text/html", "<h1>404 Not Found</h1><p>Resource " + path + " does not exist.</p>");
+                        sendResponse(exchange, 404, "text/html", "<h1>404 Not Found</h1><p>Resource " + escapeHtml(path) + " does not exist.</p>");
                     }
                 }
             } catch (Exception e) {
@@ -232,7 +243,7 @@ public class VanishServer {
 
             // Set Session Cookie
             exchange.getResponseHeaders().add("Set-Cookie", "VANISH_SESSION_ID=" + sessionId + "; Path=/; HttpOnly");
-            redirect(exchange, "/dashboard");
+            redirect(exchange, user.isAdmin() ? "/admin" : "/dashboard");
         } catch (InvalidInputException | AuthenticationException e) {
             redirect(exchange, "/login.html?error=" + urlEncode(e.getMessage()));
         }
@@ -283,6 +294,8 @@ public class VanishServer {
             renderBurnedScreen(exchange, token, e.getMessage());
         } catch (NoteExpiredException e) {
             renderExpiredScreen(exchange, token, e.getMessage());
+        } catch (NotePendingException e) {
+            renderPendingScreen(exchange, token);
         } catch (NoteNotFoundException e) {
             renderErrorScreen(exchange, "No note found with token: " + token);
         }
@@ -310,12 +323,11 @@ public class VanishServer {
             rows.append("<tr><td colspan='8' style='text-align:center; padding:2rem; color:var(--text-muted);'>No notes created yet.</td></tr>");
         } else {
             for (Note n : notes) {
-                String badge = n.getStatus() == NoteStatus.BURNED ? "badge-burned" : (n.getStatus() == NoteStatus.EXPIRED ? "badge-expired" : "badge-unread");
                 String linkUrl = baseUrl + "/read?t=" + n.getToken();
                 rows.append("<tr>")
                         .append("<td>#").append(n.getId()).append("</td>")
                         .append("<td><code class='code-font' style='color:var(--accent-warm); font-weight:600;'>").append(n.getToken()).append("</code></td>")
-                        .append("<td><span class='badge ").append(badge).append("'>").append(n.getStatus()).append("</span></td>")
+                        .append("<td>").append(statusBadge(n.getStatus())).append("</td>")
                         .append("<td>").append(n.getViewsLeft()).append("</td>")
                         .append("<td style='color:var(--text-secondary);'>").append(n.getCreatedAt().format(Note.STAMP)).append("</td>")
                         .append("<td style='color:var(--text-secondary);'>").append(n.getExpiresAt().format(Note.STAMP)).append("</td>")
@@ -331,22 +343,25 @@ public class VanishServer {
         String banner = "";
         if (createdToken != null && !createdToken.isEmpty()) {
             String fullUrl = baseUrl + "/read?t=" + createdToken;
-            banner = "<div class='alert alert-success'><div><strong>Secret Note Created!</strong> Share link: <code class='code-font' style='color:#ffffff;'>"
+            banner = "<div class='alert alert-success'><div><strong>Secret Note Created!</strong> "
+                    + (user.isAdmin() ? "" : "Waiting for admin approval before the link works. ")
+                    + "Share link: <code class='code-font' style='color:#ffffff;'>"
                     + fullUrl + "</code> <button type='button' class='btn btn-primary btn-sm copy-btn' data-url='" + fullUrl + "' style='margin-left:0.5rem;'>Copy Link</button></div></div>";
         }
 
         String html = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
-                + "<title>Dashboard — Vanish</title><link rel='stylesheet' href='/css/style.css'><script src='/js/theme.js'></script></head><body data-current-user='" + user.getUsername() + "'>"
+                + "<title>Dashboard — Vanish</title><link rel='stylesheet' href='/css/style.css'><script src='/js/theme.js'></script></head><body data-current-user='" + escapeHtml(user.getUsername()) + "'>"
                 + "<header class='navbar'><div class='container nav-wrapper'><a href='/' class='brand'><span class='brand-icon'>⚡</span><span>VANISH</span></a>"
                 + "<div class='nav-right'><nav><ul class='nav-links'><li><a href='/dashboard' class='nav-link active'>Dashboard</a></li><li><a href='/compose' class='nav-link'>Compose</a></li>"
-                + "<li><div class='user-badge'><span class='user-avatar'>👤</span><span>" + user.getUsername() + "</span></div></li>"
+                + (user.isAdmin() ? "<li><a href='/admin' class='nav-link'>Admin</a></li>" : "")
+                + "<li><div class='user-badge'><span class='user-avatar'>👤</span><span>" + escapeHtml(user.getUsername()) + "</span></div></li>"
                 + "<li><form action='/logout' method='POST' style='display:inline;'><button type='submit' class='btn btn-secondary btn-sm'>Sign Out</button></form></li></ul></nav>"
                 + "<button type='button' class='theme-toggle-btn' aria-label='Toggle theme'></button></div></div></header>"
                 + "<main class='container' style='padding-top:2.5rem; padding-bottom:3.5rem; flex:1;'>"
                 + banner
                 + "<div class='card' style='margin-bottom:2rem;'><div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;'>"
                 + "<div style='display:flex; align-items:center; gap:1rem;'><div class='user-avatar' style='width:52px; height:52px; font-size:1.4rem;'>👤</div><div>"
-                + "<h1 style='font-size:1.6rem; font-weight:700; margin:0;'>Welcome back, " + user.getUsername() + "!</h1><p style='font-size:0.85rem; color:var(--text-secondary); margin:0;'>Registered: " + user.getRegisteredAt().format(Note.STAMP) + "</p></div></div>"
+                + "<h1 style='font-size:1.6rem; font-weight:700; margin:0;'>Welcome back, " + escapeHtml(user.getUsername()) + "!</h1><p style='font-size:0.85rem; color:var(--text-secondary); margin:0;'>Registered: " + user.getRegisteredAt().format(Note.STAMP) + "</p></div></div>"
                 + "<div style='display:flex; gap:0.5rem;'><a href='#composeForm' class='btn btn-primary btn-sm'>+ New Note</a><a href='/dashboard' class='btn btn-secondary btn-sm'>↻ Refresh</a></div></div>"
                 + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:1rem; margin-top:1.5rem; padding-top:1.5rem; border-top:1px solid var(--border-subtle); font-size:0.825rem;'>"
                 + "<div><span style='color:var(--text-muted); display:block; margin-bottom:0.25rem;'>Password Hash (Salted SHA-256):</span><code class='code-font' style='color:var(--text-secondary);'>" + user.getPasswordHash().substring(0, Math.min(22, user.getPasswordHash().length())) + "...</code></div>"
@@ -360,7 +375,7 @@ public class VanishServer {
                 + "<div class='grid-2'><div class='form-group'><label class='form-label'>Expiry Duration</label><select name='expiryMinutes' class='form-control'><option value='5'>5 Minutes</option><option value='10' selected>10 Minutes</option><option value='60'>1 Hour</option><option value='1440'>24 Hours</option></select></div>"
                 + "<div class='form-group'><label class='form-label'>Allowed Views</label><select name='views' class='form-control'><option value='1' selected>1 View (Burn-On-Read)</option><option value='2'>2 Views</option><option value='3'>3 Views</option><option value='5'>5 Views</option></select></div></div>"
                 + "<button type='submit' class='btn btn-primary'>Generate Secret Link</button></form></div>"
-                + "<div class='card'><div class='card-header'><h2 class='card-title'>Active Notes Ledger</h2><p class='card-subtitle'>Live tracking and delivery status of all notes generated by " + user.getUsername() + ".</p></div>"
+                + "<div class='card'><div class='card-header'><h2 class='card-title'>Active Notes Ledger</h2><p class='card-subtitle'>Live tracking and delivery status of all notes generated by " + escapeHtml(user.getUsername()) + ".</p></div>"
                 + "<div class='table-responsive'><table class='table'><thead><tr><th>ID</th><th>Token</th><th>Status</th><th>Views Left</th><th>Created At</th><th>Expires At</th><th>Read At</th><th>Link Action</th></tr></thead><tbody>"
                 + rows.toString() + "</tbody></table></div></div></main>"
                 + "<div class='toast-container'></div>"
@@ -421,6 +436,20 @@ public class VanishServer {
         sendResponse(exchange, 200, "text/html", html);
     }
 
+    private static void renderPendingScreen(HttpExchange exchange, String token) throws IOException {
+        String html = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                + "<title>Waiting for Approval — Vanish</title><link rel='stylesheet' href='/css/style.css'><script src='/js/theme.js'></script></head><body>"
+                + "<header class='navbar'><div class='container nav-wrapper'><a href='/' class='brand'><span class='brand-icon'>⚡</span><span>VANISH</span></a>"
+                + "<div class='nav-right'><button type='button' class='theme-toggle-btn' aria-label='Toggle theme'></button></div></div></header>"
+                + "<main class='auth-wrapper' style='padding:3.5rem 1rem;'><div class='card auth-card' style='max-width:520px;'>"
+                + "<div class='burned-box' style='border-color:var(--border-subtle);'><div class='flame-icon'>⏳</div><h1 style='font-size:1.5rem; color:var(--text-muted); margin-bottom:0.5rem;'>Waiting for admin approval</h1>"
+                + "<p style='font-size:0.925rem; color:var(--text-secondary); max-width:380px; margin:0 auto 1.5rem auto;'>The sender's note is being reviewed by the Vanish admin. Nothing has been revealed or burned. Open this link again after it is approved.</p>"
+                + "<div style='margin-bottom:1.5rem; font-size:0.8rem; color:var(--text-muted);'>Token: <code class='code-font' style='color:var(--text-muted);'>" + escapeHtml(token) + "</code></div>"
+                + "<a href='/' class='btn btn-secondary btn-sm'>Return to Vanish Home</a></div></div></main>"
+                + "<footer><div class='container footer-content'><div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div><div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div></div></footer></body></html>";
+        sendResponse(exchange, 200, "text/html", html);
+    }
+
     private static void renderErrorScreen(HttpExchange exchange, String message) throws IOException {
         String html = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
                 + "<title>Notice — Vanish</title><link rel='stylesheet' href='/css/style.css'><script src='/js/theme.js'></script></head><body>"
@@ -434,6 +463,170 @@ public class VanishServer {
         sendResponse(exchange, 404, "text/html", html);
     }
 
+    // --- Admin ---
+
+    private static boolean requireAdmin(HttpExchange exchange, SessionData session) throws IOException {
+        if (session == null || session.isExpired()) {
+            redirect(exchange, "/login.html?error=" + urlEncode("Access restricted. Please log in first."));
+            return false;
+        }
+        session.touch();
+        if (!session.user.isAdmin()) {
+            sendResponse(exchange, 403, "text/html", "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>403 Forbidden — Vanish</title>"
+                    + "<link rel='stylesheet' href='/css/style.css'></head><body><main class='container' style='padding-top:2.5rem;'>"
+                    + "<div class='card'><h1>403 Forbidden</h1><div class='alert alert-danger'>Administrator access required.</div>"
+                    + "<a href='/dashboard' class='btn btn-secondary'>Back to Dashboard</a></div></main></body></html>");
+            return false;
+        }
+        return true;
+    }
+
+    private static void handleAdmin(HttpExchange exchange, SessionData session, String path, String method) throws IOException {
+        if (!requireAdmin(exchange, session)) return;
+        boolean post = "POST".equals(method);
+        try {
+            if (path.equals("/admin") && !post) {
+                renderAdminOverview(exchange, session.user);
+            } else if (path.equals("/admin/users") && !post) {
+                renderAdminUsers(exchange, session.user);
+            } else if (path.equals("/admin/notes") && !post) {
+                renderAdminNotes(exchange, session.user);
+            } else if (path.equals("/admin/approvals") && !post) {
+                renderAdminApprovals(exchange, session.user);
+            } else if (path.equals("/admin/users/delete") && post) {
+                String name = parseFormData(exchange).get("username");
+                adminService.deleteUser(name);
+                if (name != null) {
+                    activeSessions.values().removeIf(s -> name.equals(s.user.getUsername()));
+                }
+                redirect(exchange, "/admin/users?msg=" + urlEncode("User deleted."));
+            } else if (path.equals("/admin/notes/delete") && post) {
+                adminService.deleteNote(parseFormData(exchange).get("token"));
+                redirect(exchange, "/admin/notes?msg=" + urlEncode("Note deleted."));
+            } else if (path.equals("/admin/notes/burn") && post) {
+                adminService.burnNote(parseFormData(exchange).get("token"));
+                redirect(exchange, "/admin/notes?msg=" + urlEncode("Note burned."));
+            } else if (path.equals("/admin/notes/approve") && post) {
+                adminService.approveNote(parseFormData(exchange).get("token"));
+                redirect(exchange, "/admin/approvals?msg=" + urlEncode("Note approved."));
+            } else if (path.equals("/admin/notes/reject") && post) {
+                adminService.rejectNote(parseFormData(exchange).get("token"));
+                redirect(exchange, "/admin/approvals?msg=" + urlEncode("Note rejected."));
+            } else {
+                sendResponse(exchange, 404, "text/html", "<h1>404 Not Found</h1>");
+            }
+        } catch (InvalidInputException | NoteNotFoundException e) {
+            String back = path.startsWith("/admin/users") ? "/admin/users"
+                    : (path.equals("/admin/notes/approve") || path.equals("/admin/notes/reject")) ? "/admin/approvals" : "/admin/notes";
+            redirect(exchange, back + "?error=" + urlEncode(e.getMessage()));
+        }
+    }
+
+    private static void adminPage(HttpExchange exchange, User admin, String title, String active, String body) throws IOException {
+        Map<String, String> q = parseQuery(exchange.getRequestURI().getQuery());
+        String alerts = "";
+        int pending = adminService.listPendingNotes().size();
+        if (q.get("msg") != null) alerts += "<div class='alert alert-success'><div>" + escapeHtml(q.get("msg")) + "</div></div>";
+        if (q.get("error") != null) alerts += "<div class='alert alert-danger'><div>" + escapeHtml(q.get("error")) + "</div></div>";
+        String html = "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                + "<title>" + title + " — Vanish Admin</title><link rel='stylesheet' href='/css/style.css'><script src='/js/theme.js'></script></head><body>"
+                + "<header class='navbar'><div class='container nav-wrapper'><a href='/' class='brand'><span class='brand-icon'>⚡</span><span>VANISH</span></a>"
+                + "<div class='nav-right'><nav><ul class='nav-links'>"
+                + "<li><a href='/admin' class='nav-link" + ("admin".equals(active) ? " active" : "") + "'>Admin</a></li>"
+                + "<li><a href='/admin/approvals' class='nav-link" + ("approvals".equals(active) ? " active" : "") + "'>Approvals" + (pending > 0 ? " (" + pending + ")" : "") + "</a></li>"
+                + "<li><a href='/admin/users' class='nav-link" + ("users".equals(active) ? " active" : "") + "'>Users</a></li>"
+                + "<li><a href='/admin/notes' class='nav-link" + ("notes".equals(active) ? " active" : "") + "'>Notes</a></li>"
+                + "<li><div class='user-badge'><span class='user-avatar'>👤</span><span>" + escapeHtml(admin.getUsername()) + "</span></div></li>"
+                + "<li><form action='/logout' method='POST' style='display:inline;'><button type='submit' class='btn btn-secondary btn-sm'>Sign Out</button></form></li></ul></nav>"
+                + "<button type='button' class='theme-toggle-btn' aria-label='Toggle theme'></button></div></div></header>"
+                + "<main class='container' style='padding-top:2.5rem; padding-bottom:3.5rem; flex:1;'>" + alerts + body + "</main>"
+                + "<div class='toast-container'></div></body></html>";
+        sendResponse(exchange, 200, "text/html", html);
+    }
+
+    private static String statusBadge(NoteStatus s) {
+        String cls = switch (s) {
+            case PENDING -> "badge-pending";
+            case UNREAD -> "badge-unread";
+            case BURNED -> "badge-burned";
+            case EXPIRED -> "badge-expired";
+            case REJECTED -> "badge-rejected";
+        };
+        return "<span class='badge " + cls + "'>" + s + "</span>";
+    }
+
+    private static String postForm(String action, String field, String value, String label, String cls, String confirmMsg) {
+        return "<form action='" + action + "' method='POST' style='display:inline;'" + (confirmMsg != null ? " onsubmit=\"return confirm('" + confirmMsg + "');\"" : "")
+                + "><input type='hidden' name='" + field + "' value='" + escapeHtml(value) + "'><button type='submit' class='btn " + cls + " btn-sm'>" + label + "</button></form> ";
+    }
+
+    private static void renderAdminOverview(HttpExchange exchange, User admin) throws IOException {
+        AdminService.Stats st = adminService.getStats();
+        String[][] cards = {{"Users", "" + st.users(), null}, {"Notes", "" + st.notes(), null}, {"Pending approval", "" + st.pending(), "/admin/approvals"},
+                {"Unread", "" + st.unread(), null}, {"Burned", "" + st.burned(), null}, {"Expired", "" + st.expired(), null}, {"Rejected", "" + st.rejected(), null}};
+        StringBuilder sb = new StringBuilder("<h1 style='margin-bottom:1.5rem;'>Admin Overview</h1><div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:1rem; margin-bottom:2rem;'>");
+        for (String[] c : cards) {
+            String card = "<div class='card'><div style='color:var(--text-muted); font-size:0.8rem;'>" + c[0] + "</div><div style='font-size:2rem; font-weight:700;'>" + c[1] + "</div></div>";
+            sb.append(c[2] != null ? "<a href='" + c[2] + "' style='text-decoration:none; color:inherit;'>" + card + "</a>" : card);
+        }
+        sb.append("</div><div class='grid-2'><a href='/admin/users' class='btn btn-primary'>Manage Users</a><a href='/admin/notes' class='btn btn-secondary'>Manage Notes</a></div>");
+        adminPage(exchange, admin, "Overview", "admin", sb.toString());
+    }
+
+    private static void renderAdminUsers(HttpExchange exchange, User admin) throws IOException {
+        Map<String, Integer> owned = new HashMap<>();
+        for (Note n : adminService.listNotes()) owned.merge(n.getOwner(), 1, Integer::sum);
+        StringBuilder rows = new StringBuilder();
+        for (User u : adminService.listUsers()) {
+            rows.append("<tr><td>").append(escapeHtml(u.getUsername())).append("</td><td><span class='badge ")
+                    .append(u.isAdmin() ? "badge-burned" : "badge-unread").append("'>").append(u.getRole()).append("</span></td><td>")
+                    .append(u.getRegisteredAt().format(Note.STAMP)).append("</td><td>").append(owned.getOrDefault(u.getUsername(), 0)).append("</td><td>");
+            if (!u.isAdmin()) {
+                rows.append(postForm("/admin/users/delete", "username", u.getUsername(), "Delete", "btn-secondary", "Delete this user?"));
+            }
+            rows.append("</td></tr>");
+        }
+        adminPage(exchange, admin, "Users", "users", "<div class='card'><div class='card-header'><h2 class='card-title'>Users</h2></div><div class='table-responsive'><table class='table'><thead><tr>"
+                + "<th>Username</th><th>Role</th><th>Registered</th><th>Notes</th><th>Action</th></tr></thead><tbody>" + rows + "</tbody></table></div></div>");
+    }
+
+    private static void renderAdminNotes(HttpExchange exchange, User admin) throws IOException {
+        StringBuilder rows = new StringBuilder();
+        for (Note n : adminService.listNotes()) {
+            rows.append("<tr><td>#").append(n.getId()).append("</td><td><code class='code-font'>").append(escapeHtml(n.getToken())).append("</code></td><td>")
+                    .append(escapeHtml(n.getOwner())).append("</td><td>").append(statusBadge(n.getStatus())).append("</td><td>").append(n.getViewsLeft()).append("</td><td>")
+                    .append(n.getCreatedAt().format(Note.STAMP)).append("</td><td>").append(n.getExpiresAt().format(Note.STAMP)).append("</td><td>")
+                    .append(n.getReadAt() != null ? n.getReadAt().format(Note.STAMP) : "-").append("</td><td>");
+            if (n.isPending()) {
+                rows.append(postForm("/admin/notes/approve", "token", n.getToken(), "Approve", "btn-primary", null));
+                rows.append(postForm("/admin/notes/reject", "token", n.getToken(), "Reject", "btn-secondary", "Reject this note? Its ciphertext will be destroyed."));
+            }
+            if (n.getStatus() != NoteStatus.BURNED && !n.isRejected()) {
+                rows.append(postForm("/admin/notes/burn", "token", n.getToken(), "Burn", "btn-primary", null));
+            }
+            rows.append(postForm("/admin/notes/delete", "token", n.getToken(), "Delete", "btn-secondary", "Delete this note?")).append("</td></tr>");
+        }
+        adminPage(exchange, admin, "Notes", "notes", "<div class='card'><div class='card-header'><h2 class='card-title'>Notes</h2></div><div class='table-responsive'><table class='table'><thead><tr>"
+                + "<th>ID</th><th>Token</th><th>Owner</th><th>Status</th><th>Views Left</th><th>Created</th><th>Expires</th><th>Read At</th><th>Action</th></tr></thead><tbody>" + rows + "</tbody></table></div></div>");
+    }
+
+    private static void renderAdminApprovals(HttpExchange exchange, User admin) throws IOException {
+        StringBuilder rows = new StringBuilder();
+        for (Note n : adminService.listPendingNotes()) {
+            rows.append("<tr><td>#").append(n.getId()).append("</td><td><code class='code-font'>").append(escapeHtml(n.getToken())).append("</code></td><td>")
+                    .append(escapeHtml(n.getOwner())).append("</td><td>").append(n.getCreatedAt().format(Note.STAMP)).append("</td><td>").append(n.getViewsLeft()).append("</td><td>")
+                    .append(postForm("/admin/notes/approve", "token", n.getToken(), "Approve", "btn-primary", null))
+                    .append(postForm("/admin/notes/reject", "token", n.getToken(), "Reject", "btn-secondary", "Reject this note? Its ciphertext will be destroyed."))
+                    .append("</td></tr>");
+        }
+        if (rows.length() == 0) {
+            rows.append("<tr><td colspan='6' style='text-align:center; padding:2rem; color:var(--text-muted);'>No notes waiting. All clear.</td></tr>");
+        }
+        adminPage(exchange, admin, "Approvals", "approvals", "<div class='card'><div class='card-header'><h2 class='card-title'>Approval Queue</h2>"
+                + "<p class='card-subtitle'>Approve blind: secret content is never shown to the admin.</p></div><div class='table-responsive'><table class='table'><thead><tr>"
+                + "<th>ID</th><th>Token</th><th>Sender</th><th>Created</th><th>Views</th><th>Action</th></tr></thead><tbody>" + rows + "</tbody></table></div></div>");
+    }
+
     // --- Helpers ---
 
     private static SessionData getSession(HttpExchange exchange) {
@@ -442,7 +635,12 @@ public class VanishServer {
             for (String cookie : cookieHeader.split(";")) {
                 String[] pair = cookie.trim().split("=", 2);
                 if (pair.length == 2 && "VANISH_SESSION_ID".equals(pair[0])) {
-                    return activeSessions.get(pair[1]);
+                    SessionData s = activeSessions.get(pair[1]);
+                    if (s != null && userService.findByUsername(s.user.getUsername()) == null) {
+                        activeSessions.remove(s.sessionId);
+                        return null;
+                    }
+                    return s;
                 }
             }
         }
@@ -455,8 +653,14 @@ public class VanishServer {
         exchange.close();
     }
 
+    private static boolean insideWebRoot(Path filePath) {
+        Path root = webRoot.toAbsolutePath().normalize();
+        Path p = filePath.toAbsolutePath().normalize();
+        return p.startsWith(root) && !p.toString().toUpperCase(Locale.ROOT).contains("WEB-INF");
+    }
+
     private static void serveFile(HttpExchange exchange, Path filePath, String contentType) throws IOException {
-        if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
+        if (!insideWebRoot(filePath) || !Files.exists(filePath) || Files.isDirectory(filePath)) {
             sendResponse(exchange, 404, "text/html", "<h1>404 Not Found</h1>");
             return;
         }

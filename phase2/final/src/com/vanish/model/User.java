@@ -14,12 +14,18 @@ public class User {
     private final String salt;
     private final String passwordHash;
     private final LocalDateTime registeredAt;
+    private final Role role;
 
     public User(String username, String rawPassword) {
+        this(username, rawPassword, Role.USER);
+    }
+
+    public User(String username, String rawPassword, Role role) {
         this.username = username != null ? username.trim() : "";
         this.salt = CryptoUtil.generateSalt();
         this.passwordHash = CryptoUtil.hashPassword(rawPassword, this.salt);
         this.registeredAt = LocalDateTime.now();
+        this.role = role != null ? role : Role.USER;
     }
 
     public User(String username, String salt, String passwordHash, LocalDateTime registeredAt) {
@@ -27,6 +33,15 @@ public class User {
         this.salt = salt;
         this.passwordHash = passwordHash;
         this.registeredAt = registeredAt != null ? registeredAt : LocalDateTime.now();
+        this.role = Role.USER;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public boolean isAdmin() {
+        return role == Role.ADMIN;
     }
 
     public String getUsername() {
