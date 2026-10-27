@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Vanish</title>
+  <meta name="description" content="Dashboard interface demonstrating active notes ledger, remaining views, and status tracking.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme.js"></script>
+</head>
+<body data-current-user="student">
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+      <div class="nav-right">
+        <nav>
+          <ul class="nav-links">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="compose.html" class="nav-link">Compose</a></li>
+            <li><a href="dashboard_preview.html" class="nav-link active">Dashboard</a></li>
+            <li>
+              <div class="user-badge">
+                <span class="user-avatar">👤</span>
+                <span>student</span>
+              </div>
+            </li>
+            <li><a href="login.html" class="btn btn-secondary btn-sm">Sign Out</a></li>
+          </ul>
+        </nav>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container" style="padding-top: 2.5rem; padding-bottom: 3rem; flex: 1;">
+    
+    <!-- User Overview Card -->
+    <div class="card" style="margin-bottom: 2rem;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="user-avatar" style="width: 44px; height: 44px; font-size: 1.25rem;">👤</div>
+            <div>
+              <h1 style="font-size: 1.5rem; margin-bottom: 0.2rem;">Welcome back, student!</h1>
+              <p style="font-size: 0.85rem; margin: 0;">Session ID: <code class="code-font" style="color: var(--accent-cyan);">VN-SESSION-8849-LIVE</code></p>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem;">
+          <a href="compose.html" class="btn btn-primary btn-sm">+ Compose New Note</a>
+          <button type="button" id="refreshBtn" class="btn btn-secondary btn-sm">↻ Refresh Status</button>
+        </div>
+      </div>
+
+      <!-- Security Meta Info -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); font-size: 0.825rem;">
+        <div>
+          <span style="color: var(--text-muted); display: block;">Salted SHA-256 Hash:</span>
+          <code class="code-font" style="color: var(--text-secondary);">xLzPiRWljbcNbe...</code>
+        </div>
+        <div>
+          <span style="color: var(--text-muted); display: block;">Unique Salt:</span>
+          <code class="code-font" style="color: var(--text-secondary);">lP91m/P5qUdy4...</code>
+        </div>
+        <div>
+          <span style="color: var(--text-muted); display: block;">Active In-Memory Notes:</span>
+          <span style="color: var(--success); font-weight: 700;">1 Unread</span> &bull; 
+          <span style="color: var(--danger); font-weight: 700;">1 Burned</span> &bull; 
+          <span style="color: var(--text-muted); font-weight: 700;">1 Expired</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes Data Table Card -->
+    <div class="card">
+      <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h2 class="card-title">Secret Notes Ledger</h2>
+          <p class="card-subtitle">Real-time status of notes you created. Secrets are never displayed in the ledger.</p>
+        </div>
+        <div>
+          <input type="text" id="filterInput" class="form-control" placeholder="Search by token or status..." style="padding: 0.4rem 0.8rem; font-size: 0.85rem; width: 240px;">
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table" id="notesTable">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Token</th>
+              <th>Status</th>
+              <th>Views Left</th>
+              <th>Expires At</th>
+              <th>Read At</th>
+              <th>Recipient Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>#1</td>
+              <td><code class="code-font" style="color: var(--accent-cyan); font-weight: 600;">k7Qm2xR9</code></td>
+              <td><span class="badge badge-unread">UNREAD</span></td>
+              <td>1 / 1</td>
+              <td style="color: var(--text-secondary);">15-10-2026 10:22:17</td>
+              <td style="color: var(--text-muted);">-</td>
+              <td>
+                <div style="display: flex; gap: 0.5rem;">
+                  <button type="button" class="btn btn-secondary btn-sm copy-btn" data-token="k7Qm2xR9">Copy Link</button>
+                  <a href="read_preview.html?t=k7Qm2xR9" class="btn btn-primary btn-sm" target="_blank">Simulate Read</a>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>#2</td>
+              <td><code class="code-font" style="color: var(--accent-cyan); font-weight: 600;">pZ3vTn81</code></td>
+              <td><span class="badge badge-burned">BURNED</span></td>
+              <td>0 / 1</td>
+              <td style="color: var(--text-secondary);">15-10-2026 11:12:17</td>
+              <td style="color: var(--danger);">15-10-2026 10:12:17</td>
+              <td>
+                <a href="read_preview.html?t=pZ3vTn81&burned=true" class="btn btn-secondary btn-sm" target="_blank">View Burn Screen</a>
+              </td>
+            </tr>
+            <tr>
+              <td>#3</td>
+              <td><code class="code-font" style="color: var(--accent-cyan); font-weight: 600;">aX01zzQ7</code></td>
+              <td><span class="badge badge-expired">EXPIRED</span></td>
+              <td>1 / 1</td>
+              <td style="color: var(--text-muted);">15-10-2026 09:52:17</td>
+              <td style="color: var(--text-muted);">-</td>
+              <td>
+                <a href="read_preview.html?t=aX01zzQ7&expired=true" class="btn btn-secondary btn-sm" target="_blank">View Expired Screen</a>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Container -->
+  <div class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div>
+      <div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div>
+    </div>
+  </footer>
+
+  <script src="js/validation.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Copy Link Buttons
+      document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const token = btn.dataset.token;
+          const url = `${window.location.origin}/vanish/read?t=${token}`;
+          navigator.clipboard.writeText(url).then(() => {
+            showToast(`Share link for token [${token}] copied!`, 'success');
+          });
+        });
+      });
+
+      // Filter input
+      const filterInput = document.getElementById('filterInput');
+      const tableRows = document.querySelectorAll('#notesTable tbody tr');
+      if (filterInput) {
+        filterInput.addEventListener('input', () => {
+          const q = filterInput.value.toLowerCase();
+          tableRows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(q) ? '' : 'none';
+          });
+        });
+      }
+
+      // Refresh Button
+      const refreshBtn = document.getElementById('refreshBtn');
+      if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => {
+          showToast('Ledger re-synchronized with in-memory store.', 'info');
+        });
+      }
+    });
+
+    function showToast(msg, type = 'info') {
+      let container = document.querySelector('.toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+      }
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+  </script>
+</body>
+</html>

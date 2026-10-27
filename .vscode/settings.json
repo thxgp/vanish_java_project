@@ -1,0 +1,16 @@
+{
+  "java.project.sourcePaths": [
+    "phase2/final/src",
+    "phase4/src"
+  ],
+  "java.project.referencedLibraries": [
+    "lib/javax.servlet-api-4.0.1.jar",
+    "phase4/web/WEB-INF/lib/*.jar"
+  ],
+  "java.compile.nullAnalysis.mode": "automatic",
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/bin": false
+  }
+}

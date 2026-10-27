@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — Vanish</title>
+  <meta name="description" content="Sign in to your Vanish account to access your active notes ledger and manage one-time secrets.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+
+      <div class="nav-right">
+        <nav>
+          <ul class="nav-links">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="register.html" class="nav-link">Create Account</a></li>
+          </ul>
+        </nav>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="auth-wrapper">
+    <div class="card auth-card">
+      <div class="card-header">
+        <h1 class="card-title">Welcome Back</h1>
+        <p class="card-subtitle">Sign in to monitor your secret notes and read receipts.</p>
+      </div>
+
+      <!-- Server Alert -->
+      <div id="serverAlert" style="display: none;"></div>
+
+      <!-- Login Form -->
+      <form id="loginForm" action="login" method="POST" novalidate>
+        
+        <!-- Username Field -->
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-control" 
+            placeholder="Enter your username" 
+            autocomplete="username"
+            required>
+          <div id="usernameError" class="error-feedback"></div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-control" 
+              placeholder="Enter your password" 
+              autocomplete="current-password"
+              required>
+            <button type="button" class="toggle-password" id="togglePasswordBtn" aria-label="Show password">👁</button>
+          </div>
+          <div id="passwordError" class="error-feedback"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary btn-block" style="margin-top: 0.5rem;">
+          <span>Sign In to Dashboard</span>
+        </button>
+      </form>
+
+      <div style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem;">
+        <span style="color: var(--text-secondary);">Don't have an account yet?</span> 
+        <a href="register.html" style="font-weight: 600;">Create one now</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Container -->
+  <div class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div>
+      <div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div>
+    </div>
+  </footer>
+
+  <script src="js/validation.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const serverAlert = document.getElementById('serverAlert');
+      if (urlParams.has('error')) {
+        serverAlert.className = 'alert alert-danger';
+        serverAlert.textContent = urlParams.get('error');
+        serverAlert.style.display = 'flex';
+      } else if (urlParams.has('msg')) {
+        serverAlert.className = 'alert alert-success';
+        serverAlert.textContent = urlParams.get('msg');
+        serverAlert.style.display = 'flex';
+      }
+
+      const form = document.getElementById('loginForm');
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      const usernameError = document.getElementById('usernameError');
+      const passwordError = document.getElementById('passwordError');
+
+      form.addEventListener('submit', (e) => {
+        const uVal = usernameInput.value.trim();
+        const pVal = passwordInput.value;
+
+        const uRes = uVal.length === 0 ? { valid: false, message: 'Please enter your username.' } : { valid: true };
+        const pRes = pVal.length === 0 ? { valid: false, message: 'Please enter your password.' } : { valid: true };
+
+        VanishValidation.setFieldState(usernameInput, usernameError, uRes);
+        VanishValidation.setFieldState(passwordInput, passwordError, pRes);
+
+        if (!uRes.valid || !pRes.valid) {
+          e.preventDefault();
+          if (!uRes.valid) usernameInput.focus();
+          else passwordInput.focus();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

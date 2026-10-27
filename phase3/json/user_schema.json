@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VanishUser",
+  "description": "JSON representation of user registration data as required by CLO2",
+  "type": "object",
+  "properties": {
+    "username": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 20,
+      "pattern": "^[a-zA-Z0-9_]+$",
+      "description": "User login handle with no spaces"
+    },
+    "password": {
+      "type": "string",
+      "minLength": 8,
+      "description": "Password containing uppercase, lowercase, digit, and special characters"
+    },
+    "confirmPassword": {
+      "type": "string",
+      "description": "Must match password attribute"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 client submission timestamp"
+    }
+  },
+  "required": ["username", "password", "confirmPassword"]
+}

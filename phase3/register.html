@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — Vanish</title>
+  <meta name="description" content="Register an account on Vanish to create and monitor self-destructing encrypted secret notes.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+
+      <div class="nav-right">
+        <nav>
+          <ul class="nav-links">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="login.html" class="nav-link">Sign In</a></li>
+          </ul>
+        </nav>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="auth-wrapper">
+    <div class="card auth-card">
+      <div class="card-header">
+        <h1 class="card-title">Create Account</h1>
+        <p class="card-subtitle">Set up an account to track your secrets and access live read receipts.</p>
+      </div>
+
+      <!-- Server Error Alert -->
+      <div id="serverAlert" style="display: none;"></div>
+
+      <!-- Registration Form -->
+      <form id="registerForm" action="dashboard_preview.html" method="GET" novalidate>
+        
+        <!-- Username Field -->
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-control" 
+            placeholder="Choose a username" 
+            autocomplete="username"
+            required>
+          <div id="usernameError" class="error-feedback"></div>
+          <div class="form-hint">
+            <span>3-20 characters &bull; letters, numbers, underscore only</span>
+          </div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              id="password" 
+              name="password" 
+              class="form-control" 
+              placeholder="Create a strong password" 
+              autocomplete="new-password"
+              required>
+            <button type="button" class="toggle-password" id="togglePasswordBtn" aria-label="Show password">👁</button>
+          </div>
+          <div id="passwordError" class="error-feedback"></div>
+          <div class="form-hint">
+            <span>Min 8 chars, 1 uppercase, 1 lowercase, 1 number, 1 special symbol</span>
+          </div>
+        </div>
+
+        <!-- Confirm Password Field -->
+        <div class="form-group">
+          <label for="confirmPassword" class="form-label">Confirm Password</label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              id="confirmPassword" 
+              name="confirmPassword" 
+              class="form-control" 
+              placeholder="Re-enter password" 
+              autocomplete="new-password"
+              required>
+            <button type="button" class="toggle-password" id="toggleConfirmBtn" aria-label="Show password">👁</button>
+          </div>
+          <div id="confirmPasswordError" class="error-feedback"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="registerSubmitBtn" class="btn btn-primary btn-block" style="margin-top: 1.5rem;">
+          Create Free Account
+        </button>
+
+        <!-- Redirect to Login -->
+        <p style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+          Already have an account? 
+          <a href="login.html" style="color: var(--primary); font-weight: 600; text-decoration: none;">Sign in here</a>
+        </p>
+      </form>
+    </div>
+  </main>
+
+  <div class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div>
+      <div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div>
+    </div>
+  </footer>
+
+  <script src="js/validation.js"></script>
+  <script src="js/register.js"></script>
+</body>
+</html>

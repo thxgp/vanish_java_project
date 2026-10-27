@@ -1,0 +1,19 @@
+{
+  "request": {
+    "owner": "student",
+    "secretText": "Server database root password is: Sup3r$ecureDbPass!",
+    "expiryMinutes": 60,
+    "views": 1,
+    "timestamp": "2026-10-15T10:15:00.000Z"
+  },
+  "response": {
+    "id": 1,
+    "token": "k7Qm2xR9",
+    "shareLink": "/vanish/read?t=k7Qm2xR9",
+    "status": "UNREAD",
+    "viewsLeft": 1,
+    "createdAt": "15-10-2026 10:15:00",
+    "expiresAt": "15-10-2026 11:15:00",
+    "ciphertextPreview": "WMOQdF0cek8MuoTjJ7SEiX1j..."
+  }
+}

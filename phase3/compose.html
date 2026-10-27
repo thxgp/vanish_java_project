@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compose Secret Note — Vanish</title>
+  <meta name="description" content="Generate a one-time self-destructing secret note with memory encryption.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+
+      <div class="nav-right">
+        <nav>
+          <ul class="nav-links">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="dashboard_preview.html" class="nav-link">Dashboard</a></li>
+            <li><a href="compose.html" class="nav-link active">Compose</a></li>
+            <li><a href="login.html" class="btn btn-secondary btn-sm">Sign Out</a></li>
+          </ul>
+        </nav>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container" style="padding-top: 3rem; padding-bottom: 3.5rem; flex: 1;">
+    <div style="max-width: 680px; margin: 0 auto;">
+      
+      <!-- Compose Card -->
+      <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="card-title" style="font-size: 1.35rem;">Compose Secret Note</h1>
+            <p class="card-subtitle">Encrypted directly in RAM. Zero disk traces.</p>
+          </div>
+          <span class="badge badge-unread">AES-256</span>
+        </div>
+
+        <form id="composeNoteForm" action="read_preview.html" method="GET" novalidate>
+          
+          <!-- Secret Text Area -->
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label for="secretText" class="form-label" style="margin-bottom: 0;">Secret Note Content</label>
+              <span id="charCounter" style="font-size: 0.775rem; color: var(--text-muted); font-family: var(--font-mono);">0 / 500 chars</span>
+            </div>
+            <textarea 
+              id="secretText" 
+              name="secretText" 
+              class="form-control" 
+              rows="5" 
+              placeholder="Paste password, credentials, private key, or confidential message..." 
+              maxlength="500" 
+              required></textarea>
+            <div id="secretTextError" class="error-feedback"></div>
+            <div class="form-hint">Plaintext is encrypted with AES-256 before being held in volatile memory.</div>
+          </div>
+
+          <!-- Options Grid -->
+          <div class="grid-2">
+            <!-- Expiry Duration -->
+            <div class="form-group">
+              <label for="expiryMinutes" class="form-label">Self-Destruct Timer</label>
+              <select id="expiryMinutes" name="expiryMinutes" class="form-control">
+                <option value="5">5 Minutes</option>
+                <option value="10" selected>10 Minutes</option>
+                <option value="60">1 Hour</option>
+                <option value="1440">24 Hours</option>
+              </select>
+              <div class="form-hint">Note burns automatically after duration expires.</div>
+            </div>
+
+            <!-- Allowed Views -->
+            <div class="form-group">
+              <label for="views" class="form-label">Allowed Views</label>
+              <select id="views" name="views" class="form-control">
+                <option value="1" selected>1 View (Standard Burn)</option>
+                <option value="2">2 Views</option>
+                <option value="3">3 Views</option>
+                <option value="5">5 Views</option>
+              </select>
+              <div class="form-hint">Purges ciphertext from RAM when views hit zero.</div>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display: flex; gap: 0.75rem; margin-top: 0.5rem;">
+            <button type="submit" id="composeSubmitBtn" class="btn btn-primary" style="flex: 2;">
+              <span>Generate One-Time Link</span>
+            </button>
+            <a href="dashboard_preview.html" class="btn btn-secondary" style="flex: 1;">
+              <span>Back to Dashboard</span>
+            </a>
+          </div>
+        </form>
+      </div>
+
+      <!-- Generated Result Box (Client-side simulation fallback) -->
+      <div id="composeResultCard" class="card" style="margin-top: 1.5rem; display: none;">
+        <div class="alert alert-success" style="margin-bottom: 1rem;">
+          <div>
+            <strong>Link Ready!</strong> Send this single-use link to the recipient.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="generatedLink" class="form-control code-font" readonly style="color: var(--primary); font-weight: 600;">
+            <button type="button" id="copyLinkBtn" class="btn btn-primary">Copy Link</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div>
+      <div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div>
+    </div>
+  </footer>
+
+  <script src="js/validation.js"></script>
+  <script src="js/compose.js"></script>
+</body>
+</html>

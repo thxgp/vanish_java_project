@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — Vanish</title>
+  <meta name="description" content="Register an account on Vanish to create and monitor self-destructing encrypted secret notes.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+
+      <div class="nav-right">
+        <nav>
+          <ul class="nav-links">
+            <li><a href="index.html" class="nav-link">Home</a></li>
+            <li><a href="login.html" class="nav-link">Sign In</a></li>
+          </ul>
+        </nav>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="auth-wrapper">
+    <div class="card auth-card">
+      <div class="card-header">
+        <h1 class="card-title">Create Account</h1>
+        <p class="card-subtitle">Set up an account to track your secrets and access live read receipts.</p>
+      </div>
+
+      <!-- Server Error Alert -->
+      <div id="serverAlert" style="display: none;"></div>
+
+      <!-- Registration Form -->
+      <form id="registerForm" action="register" method="POST" novalidate>
+        
+        <!-- Username Field -->
+        <div class="form-group">
+          <label for="username" class="form-label">Username</label>
+          <input 
+            type="text" 
+            id="username" 
+            name="username" 
+            class="form-control" 
+            placeholder="Choose a username" 
+            autocomplete="username"
+            required>
+          <div id="usernameError" class="error-feedback"></div>
+          <div class="form-hint">
+            <span>3-20 characters &bull; letters, numbers, underscore only</span>
+          </div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            class="form-control" 
+            placeholder="Create a strong password" 
+            autocomplete="new-password"
+            required>
+          <div id="passwordError" class="error-feedback"></div>
+          
+          <!-- Live Password Strength Meter -->
+          <div class="strength-meter">
+            <div class="strength-bar-bg">
+              <div id="strengthBar" class="strength-bar-fill"></div>
+            </div>
+            <div class="strength-label">
+              <span>Security Level:</span>
+              <span id="strengthText">None</span>
+            </div>
+          </div>
+
+          <!-- Live Password Checklist -->
+          <ul class="checklist" id="pwdChecklist">
+            <li id="check-len">○ At least 8 characters</li>
+            <li id="check-upper">○ One uppercase letter (A-Z)</li>
+            <li id="check-lower">○ One lowercase letter (a-z)</li>
+            <li id="check-digit">○ One number (0-9)</li>
+            <li id="check-special">○ One special symbol (!@#$%^&*...)</li>
+          </ul>
+        </div>
+
+        <!-- Confirm Password Field -->
+        <div class="form-group">
+          <label for="confirmPassword" class="form-label">Confirm Password</label>
+          <input 
+            type="password" 
+            id="confirmPassword" 
+            name="confirmPassword" 
+            class="form-control" 
+            placeholder="Repeat your password" 
+            autocomplete="new-password"
+            required>
+          <div id="confirmPasswordError" class="error-feedback"></div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="registerSubmitBtn" class="btn btn-primary btn-block" style="margin-top: 0.5rem;">
+          <span>Complete Registration</span>
+        </button>
+      </form>
+
+      <div style="margin-top: 1.5rem; text-align: center; font-size: 0.9rem;">
+        <span style="color: var(--text-secondary);">Already have an account?</span> 
+        <a href="login.html" style="font-weight: 600;">Sign in here</a>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast Container -->
+  <div class="toast-container"></div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-content">
+      <div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div>
+      <div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/validation.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const serverAlert = document.getElementById('serverAlert');
+      if (urlParams.has('error')) {
+        serverAlert.className = 'alert alert-danger';
+        serverAlert.textContent = urlParams.get('error');
+        serverAlert.style.display = 'flex';
+      }
+
+      const form = document.getElementById('registerForm');
+      const usernameInput = document.getElementById('username');
+      const passwordInput = document.getElementById('password');
+      const confirmInput = document.getElementById('confirmPassword');
+
+      const usernameError = document.getElementById('usernameError');
+      const passwordError = document.getElementById('passwordError');
+      const confirmError = document.getElementById('confirmPasswordError');
+
+      const strengthBar = document.getElementById('strengthBar');
+      const strengthText = document.getElementById('strengthText');
+
+      const checkLen = document.getElementById('check-len');
+      const checkUpper = document.getElementById('check-upper');
+      const checkLower = document.getElementById('check-lower');
+      const checkDigit = document.getElementById('check-digit');
+      const checkSpecial = document.getElementById('check-special');
+
+      // Live validation on username
+      usernameInput.addEventListener('input', () => {
+        const res = VanishValidation.validateUsername(usernameInput.value);
+        VanishValidation.setFieldState(usernameInput, usernameError, res);
+      });
+
+      // Live validation on password with strength meter
+      passwordInput.addEventListener('input', () => {
+        const res = VanishValidation.validatePassword(passwordInput.value);
+        VanishValidation.setFieldState(passwordInput, passwordError, res);
+
+        const updateCheck = (el, valid, text) => {
+          el.className = valid ? 'valid' : '';
+          el.textContent = (valid ? '✓ ' : '○ ') + text;
+        };
+        updateCheck(checkLen, res.checks.length, 'At least 8 characters');
+        updateCheck(checkUpper, res.checks.upper, 'One uppercase letter (A-Z)');
+        updateCheck(checkLower, res.checks.lower, 'One lowercase letter (a-z)');
+        updateCheck(checkDigit, res.checks.digit, 'One number (0-9)');
+        updateCheck(checkSpecial, res.checks.special, 'One special symbol (!@#$%^&*...)');
+
+        strengthBar.style.width = res.score + '%';
+        if (res.score <= 40) {
+          strengthBar.style.backgroundColor = 'var(--danger)';
+          strengthText.textContent = 'Weak';
+          strengthText.style.color = 'var(--danger)';
+        } else if (res.score <= 80) {
+          strengthBar.style.backgroundColor = 'var(--warning)';
+          strengthText.textContent = 'Moderate';
+          strengthText.style.color = 'var(--warning)';
+        } else {
+          strengthBar.style.backgroundColor = 'var(--success)';
+          strengthText.textContent = 'Strong (Protected)';
+          strengthText.style.color = 'var(--success)';
+        }
+
+        if (confirmInput.value.length > 0) {
+          const matchRes = VanishValidation.validatePasswordConfirmation(passwordInput.value, confirmInput.value);
+          VanishValidation.setFieldState(confirmInput, confirmError, matchRes);
+        }
+      });
+
+      // Live validation on confirm password
+      confirmInput.addEventListener('input', () => {
+        const res = VanishValidation.validatePasswordConfirmation(passwordInput.value, confirmInput.value);
+        VanishValidation.setFieldState(confirmInput, confirmError, res);
+      });
+
+      // Form submission validation
+      form.addEventListener('submit', (e) => {
+        const uRes = VanishValidation.validateUsername(usernameInput.value);
+        const pRes = VanishValidation.validatePassword(passwordInput.value);
+        const cRes = VanishValidation.validatePasswordConfirmation(passwordInput.value, confirmInput.value);
+
+        VanishValidation.setFieldState(usernameInput, usernameError, uRes);
+        VanishValidation.setFieldState(passwordInput, passwordError, pRes);
+        VanishValidation.setFieldState(confirmInput, confirmError, cRes);
+
+        if (!uRes.valid || !pRes.valid || !cRes.valid) {
+          e.preventDefault();
+          if (!uRes.valid) usernameInput.focus();
+          else if (!pRes.valid) passwordInput.focus();
+          else confirmInput.focus();
+        }
+      });
+    });
+  </script>
+</body>
+</html>

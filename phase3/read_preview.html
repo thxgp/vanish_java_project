@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secret Revealed — Vanish</title>
+  <meta name="description" content="View a one-time self-destructing secret note. Once opened, it vanishes forever.">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/theme.js"></script>
+</head>
+<body>
+
+  <!-- Minimal Recipient Header -->
+  <header class="navbar">
+    <div class="container nav-wrapper">
+      <a href="index.html" class="brand">
+        <span class="brand-icon">⚡</span>
+        <span>VANISH</span>
+      </a>
+      <div class="nav-right">
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Encrypted Handoff</span>
+        <button type="button" class="theme-toggle-btn" aria-label="Toggle theme"></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="auth-wrapper" style="padding: 3rem 1rem;">
+    <div class="card auth-card" style="max-width: 560px;">
+      
+      <!-- State 1: Active Secret Revealed -->
+      <div id="activeState">
+        <div class="card-header" style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1 class="card-title" style="font-size: 1.35rem; color: #34d399;">Secret Revealed</h1>
+            <span class="badge badge-unread">1st & Final View</span>
+          </div>
+          <p class="card-subtitle">
+            This note was created for you. As you read this, the key has expired and the note is being burned.
+          </p>
+        </div>
+
+        <div class="secret-box">
+          <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 0.25rem;">
+            Decrypted Secret Message:
+          </div>
+          <div class="secret-text" id="revealedSecretText">
+            ATM PIN: 4821
+          </div>
+        </div>
+
+        <div class="alert alert-warning" style="font-size: 0.825rem; margin-bottom: 1.5rem;">
+          <div>
+            <strong>Warning:</strong> If you refresh or leave this page, the message is permanently destroyed from memory and cannot be recovered.
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" id="copySecretBtn" class="btn btn-primary btn-block">Copy Secret</button>
+          <button type="button" id="burnNowBtn" class="btn btn-danger btn-block">Burn Now</button>
+        </div>
+      </div>
+
+      <!-- State 2: Burned State -->
+      <div id="burnedState" style="display: none;">
+        <div class="burned-box">
+          <div class="flame-icon">🔥</div>
+          <h2 style="font-size: 1.4rem; color: #f87171; margin-bottom: 0.5rem;">This note has been burned</h2>
+          <p style="font-size: 0.9rem; color: var(--text-secondary); max-width: 400px; margin: 0 auto 1.5rem auto;">
+            The secret content has been completely purged from server RAM and the link is permanently dead.
+          </p>
+          <a href="index.html" class="btn btn-secondary btn-sm">Return to Vanish Home</a>
+        </div>
+      </div>
+
+      <!-- State 3: Expired State -->
+      <div id="expiredState" style="display: none;">
+        <div class="burned-box" style="border-color: rgba(148, 163, 184, 0.3);">
+          <div class="flame-icon" style="filter: grayscale(1);">⏳</div>
+          <h2 style="font-size: 1.4rem; color: #94a3b8; margin-bottom: 0.5rem;">This note has expired</h2>
+          <p style="font-size: 0.9rem; color: var(--text-secondary); max-width: 400px; margin: 0 auto 1.5rem auto;">
+            The sender set a self-destruction timer that elapsed before this link was opened.
+          </p>
+          <a href="index.html" class="btn btn-secondary btn-sm">Return to Vanish Home</a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <div class="toast-container"></div>
+
+  <footer>
+    <div class="container footer-content">
+      <div>&copy; 2026 Vanish &bull; Military-grade One-Time Secret Handoff</div>
+      <div><span>Zero Knowledge &bull; End-to-End In-Memory Encryption</span></div>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isBurned = urlParams.get('burned') === 'true';
+      const isExpired = urlParams.get('expired') === 'true';
+
+      const activeState = document.getElementById('activeState');
+      const burnedState = document.getElementById('burnedState');
+      const expiredState = document.getElementById('expiredState');
+      const copyBtn = document.getElementById('copySecretBtn');
+      const burnBtn = document.getElementById('burnNowBtn');
+      const secretText = document.getElementById('revealedSecretText');
+
+      if (isBurned) {
+        activeState.style.display = 'none';
+        burnedState.style.display = 'block';
+      } else if (isExpired) {
+        activeState.style.display = 'none';
+        expiredState.style.display = 'block';
+      }
+
+      if (copyBtn && secretText) {
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(secretText.textContent.trim()).then(() => {
+            showToast('Secret message copied to clipboard!', 'success');
+          });
+        });
+      }
+
+      if (burnBtn) {
+        burnBtn.addEventListener('click', () => {
+          activeState.style.display = 'none';
+          burnedState.style.display = 'block';
+          showToast('Secret purged and destroyed forever.', 'error');
+        });
+      }
+    });
+
+    function showToast(msg, type = 'info') {
+      let container = document.querySelector('.toast-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+      }
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
