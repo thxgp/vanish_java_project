@@ -597,6 +597,18 @@ textarea.form-control {
   line-height: 1;
 }
 
+.badge-pending {
+  background: var(--warning-bg, rgba(245, 158, 11, 0.12));
+  color: var(--warning, #f59e0b);
+  border: 1px solid var(--warning-border, rgba(245, 158, 11, 0.35));
+}
+
+.badge-rejected {
+  background: var(--danger-bg);
+  color: var(--text-muted);
+  border: 1px dashed var(--danger-border);
+}
+
 .badge-unread {
   background: var(--success-bg);
   color: var(--success);

@@ -47,7 +47,7 @@ public class LoginServlet extends HttpServlet {
             session.setAttribute("username", authenticatedUser.getUsername());
             session.setMaxInactiveInterval(30 * 60); // 30 minutes session timeout
 
-            resp.sendRedirect(req.getContextPath() + "/dashboard");
+            resp.sendRedirect(req.getContextPath() + (authenticatedUser.isAdmin() ? "/admin" : "/dashboard"));
         } catch (InvalidInputException | AuthenticationException e) {
             String errorMsg = URLEncoder.encode(e.getMessage(), StandardCharsets.UTF_8.name());
             resp.sendRedirect(req.getContextPath() + "/login?error=" + errorMsg);

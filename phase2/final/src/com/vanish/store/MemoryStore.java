@@ -82,6 +82,37 @@ public class MemoryStore {
         return ownerNotes;
     }
 
+    // --- Admin Operations ---
+
+    public List<User> findAllUsers() {
+        List<User> users = new ArrayList<>(usersByUsername.values());
+        users.sort((a, b) -> a.getRegisteredAt().compareTo(b.getRegisteredAt()));
+        return users;
+    }
+
+    public List<Note> findAllNotes() {
+        List<Note> notes = new ArrayList<>(notesByToken.values());
+        notes.sort((a, b) -> Integer.compare(a.getId(), b.getId()));
+        return notes;
+    }
+
+    /** Removes the user and every note they own. Returns false if the user does not exist. */
+    public boolean deleteUser(String username) {
+        if (username == null) {
+            return false;
+        }
+        String key = username.trim().toLowerCase();
+        if (usersByUsername.remove(key) == null) {
+            return false;
+        }
+        notesByToken.values().removeIf(n -> n.getOwner().equalsIgnoreCase(key));
+        return true;
+    }
+
+    public boolean deleteNote(String token) {
+        return token != null && notesByToken.remove(token) != null;
+    }
+
     public void clear() {
         usersByUsername.clear();
         notesByToken.clear();

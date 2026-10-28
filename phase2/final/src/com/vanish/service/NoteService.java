@@ -4,6 +4,7 @@ import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.NoteBurnedException;
 import com.vanish.exception.NoteExpiredException;
 import com.vanish.exception.NoteNotFoundException;
+import com.vanish.exception.NotePendingException;
 import com.vanish.model.Note;
 
 import java.time.LocalDateTime;
@@ -40,11 +41,12 @@ public interface NoteService {
      * @param token unique URL-safe token
      * @return the secret message text
      * @throws NoteNotFoundException if no note exists for the given token
-     * @throws NoteBurnedException   if the note was already viewed and destroyed
+     * @throws NoteBurnedException   if the note was already viewed and destroyed, or rejected by the admin
      * @throws NoteExpiredException  if the note's expiry time has elapsed
+     * @throws NotePendingException  if the admin has not approved the note yet
      */
     String readNote(String token)
-            throws NoteNotFoundException, NoteBurnedException, NoteExpiredException;
+            throws NoteNotFoundException, NoteBurnedException, NoteExpiredException, NotePendingException;
 
     /**
      * Retrieves all notes created by a specific user for dashboard display.

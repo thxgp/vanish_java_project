@@ -3,6 +3,7 @@ package com.vanish.service.impl;
 import com.vanish.exception.AuthenticationException;
 import com.vanish.exception.InvalidInputException;
 import com.vanish.exception.UserAlreadyExistsException;
+import com.vanish.model.Role;
 import com.vanish.model.User;
 import com.vanish.service.UserService;
 import com.vanish.store.MemoryStore;
@@ -42,6 +43,23 @@ public class UserServiceImpl implements UserService {
         User newUser = new User(trimmedUsername, password);
         store.saveUser(newUser);
         return newUser;
+    }
+
+    @Override
+    public User registerAdmin(String username, String password)
+            throws InvalidInputException, UserAlreadyExistsException {
+
+        ValidationUtil.validateUsername(username);
+        ValidationUtil.validatePassword(password);
+
+        String trimmedUsername = username.trim();
+        if (store.userExists(trimmedUsername)) {
+            throw new UserAlreadyExistsException("The username '" + trimmedUsername + "' is already registered.");
+        }
+
+        User admin = new User(trimmedUsername, password, Role.ADMIN);
+        store.saveUser(admin);
+        return admin;
     }
 
     @Override

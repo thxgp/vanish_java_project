@@ -94,7 +94,7 @@ run.bat
 cd phase4
 java -cp "web/WEB-INF/lib/javax.servlet-api-4.0.1.jar;bin" com.vanish.test.Phase4Test
 ```
-*(Executes 21 end-to-end tests validating 100% of the syllabus requirements).*
+*(Executes 42 end-to-end tests, including the admin approval flow, validating 100% of the syllabus requirements).*
 
 ---
 
@@ -103,3 +103,20 @@ java -cp "web/WEB-INF/lib/javax.servlet-api-4.0.1.jar;bin" com.vanish.test.Phase
 For quick evaluation, pre-configured credentials are provided:
 - **Username:** `student`
 - **Password:** `JavaPass@123`
+
+---
+
+## Admin: The Middleman
+
+Every note from a normal user passes through the admin before it can be read:
+
+1. Sender composes a note: it is created as `PENDING`.
+2. Recipient opening the link sees *"Waiting for admin approval"*. Nothing is revealed or burned.
+3. Admin opens `/admin/approvals` and **approves** (link goes live, expiry clock starts now) or **rejects** (ciphertext purged, recipient sees *"rejected by the admin"*).
+4. Admin approves **blind**: he sees sender, token, time and view count, never the secret.
+
+Admin's own notes skip the queue. Admin also keeps `/admin/users` and `/admin/notes` (delete users, burn/delete notes) and sees stats on `/admin`. Works in both the standalone server and Tomcat.
+
+- **Default admin:** `admin` / `Admin@12345`. Override with env vars `VANISH_ADMIN_USER` and `VANISH_ADMIN_PASSWORD`.
+- Anonymous visitors are redirected to login; non-admin users get `403`.
+- Phases 1-2 console demos have no admin, so they auto-approve their notes.

@@ -3,6 +3,7 @@ package com.vanish.web;
 import com.vanish.exception.NoteBurnedException;
 import com.vanish.exception.NoteExpiredException;
 import com.vanish.exception.NoteNotFoundException;
+import com.vanish.exception.NotePendingException;
 import com.vanish.service.NoteService;
 import com.vanish.service.impl.NoteServiceImpl;
 
@@ -48,6 +49,9 @@ public class ReadNoteServlet extends HttpServlet {
             req.setAttribute("token", token);
             req.setAttribute("reason", e.getMessage());
             req.getRequestDispatcher("/expired.jsp").forward(req, resp);
+        } catch (NotePendingException e) {
+            req.setAttribute("token", token);
+            req.getRequestDispatcher("/pending.jsp").forward(req, resp);
         } catch (NoteNotFoundException e) {
             req.setAttribute("token", token);
             req.setAttribute("errorMessage", "Invalid link or note does not exist (Token: " + token + ")");

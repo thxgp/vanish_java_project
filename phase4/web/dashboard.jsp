@@ -3,6 +3,7 @@
 <%@ page import="com.vanish.model.Note"%>
 <%@ page import="com.vanish.model.NoteStatus"%>
 <%@ page import="java.util.List"%>
+<%@ page import="com.vanish.web.Html"%>
 <%
     User user = (User) session.getAttribute("user");
     if (user == null) {
@@ -23,7 +24,7 @@
   <link rel="stylesheet" href="<%= request.getContextPath() %>/css/style.css">
   <script src="<%= request.getContextPath() %>/js/theme.js"></script>
 </head>
-<body data-current-user="<%= user.getUsername() %>">
+<body data-current-user="<%= Html.esc(user.getUsername()) %>">
 
   <!-- Navigation Bar -->
   <header class="navbar">
@@ -38,10 +39,11 @@
           <ul class="nav-links">
             <li><a href="<%= request.getContextPath() %>/dashboard" class="nav-link active">Dashboard</a></li>
             <li><a href="<%= request.getContextPath() %>/compose" class="nav-link">Compose</a></li>
+            <% if (user.isAdmin()) { %><li><a href="<%= request.getContextPath() %>/admin" class="nav-link">Admin</a></li><% } %>
             <li>
               <div class="user-badge">
                 <span class="user-avatar">👤</span>
-                <span><%= user.getUsername() %></span>
+                <span><%= Html.esc(user.getUsername()) %></span>
               </div>
             </li>
             <li>
@@ -66,10 +68,11 @@
       <div class="alert alert-success" style="margin-bottom: 1.5rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 0.75rem;">
           <div>
-            <strong>Secret Note Created!</strong> Single-use link: 
-            <code class="code-font" style="color: var(--text-primary); font-weight: bold; margin-left: 0.5rem;"><%= shareUrl %></code>
+            <strong>Secret Note Created!</strong>
+            <%= user.isAdmin() ? "Single-use link:" : "Waiting for admin approval before the link works." %>
+            <code class="code-font" style="color: var(--text-primary); font-weight: bold; margin-left: 0.5rem;"><%= Html.esc(shareUrl) %></code>
           </div>
-          <button type="button" class="btn btn-primary btn-sm copy-btn" data-url="<%= shareUrl %>">Copy Link</button>
+          <button type="button" class="btn btn-primary btn-sm copy-btn" data-url="<%= Html.esc(shareUrl) %>">Copy Link</button>
         </div>
       </div>
     <% } %>
@@ -80,7 +83,7 @@
         <div style="display: flex; align-items: center; gap: 1rem;">
           <div class="user-avatar" style="width: 48px; height: 48px; font-size: 1.35rem;">👤</div>
           <div>
-            <h1 style="font-size: 1.5rem; margin: 0;">Welcome, <%= user.getUsername() %></h1>
+            <h1 style="font-size: 1.5rem; margin: 0;">Welcome, <%= Html.esc(user.getUsername()) %></h1>
             <p style="font-size: 0.85rem; margin: 0; color: var(--text-secondary);">
               All notes are encrypted with AES-256 and kept exclusively in volatile memory.
             </p>
@@ -173,17 +176,21 @@
             <% } else { 
                 for (Note n : notes) {
                   String badgeClass = "badge-unread";
-                  if (n.getStatus() == NoteStatus.BURNED) {
+                  if (n.getStatus() == NoteStatus.PENDING) {
+                    badgeClass = "badge-pending";
+                  } else if (n.getStatus() == NoteStatus.BURNED) {
                     badgeClass = "badge-burned";
                   } else if (n.getStatus() == NoteStatus.EXPIRED) {
                     badgeClass = "badge-expired";
+                  } else if (n.getStatus() == NoteStatus.REJECTED) {
+                    badgeClass = "badge-rejected";
                   }
                   String linkUrl = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + request.getContextPath() + "/read?t=" + n.getToken();
             %>
               <tr>
                 <td>#<%= n.getId() %></td>
-                <td><code class="code-font" style="color: var(--primary); font-weight: 600;"><%= n.getToken() %></code></td>
-                <td><span class="badge <%= badgeClass %>"><%= n.getStatus() %></span></td>
+                <td><code class="code-font" style="color: var(--primary); font-weight: 600;"><%= Html.esc(n.getToken()) %></code></td>
+                <td><span class="badge <%= badgeClass %>"><%= Html.esc(String.valueOf(n.getStatus())) %></span></td>
                 <td><%= n.getViewsLeft() %></td>
                 <td style="color: var(--text-secondary);"><%= n.getCreatedAt().format(Note.STAMP) %></td>
                 <td style="color: var(--text-secondary);"><%= n.getExpiresAt().format(Note.STAMP) %></td>
@@ -192,8 +199,8 @@
                 </td>
                 <td>
                   <div style="display: flex; gap: 0.4rem;">
-                    <button type="button" class="btn btn-secondary btn-sm copy-btn" data-url="<%= linkUrl %>">Copy</button>
-                    <a href="<%= linkUrl %>" class="btn btn-primary btn-sm" target="_blank">Open</a>
+                    <button type="button" class="btn btn-secondary btn-sm copy-btn" data-url="<%= Html.esc(linkUrl) %>">Copy</button>
+                    <a href="<%= Html.esc(linkUrl) %>" class="btn btn-primary btn-sm" target="_blank">Open</a>
                   </div>
                 </td>
               </tr>

@@ -15,6 +15,8 @@ import java.io.IOException;
 @WebFilter(filterName = "AuthFilter", urlPatterns = {"/dashboard", "/dashboard.jsp", "/compose", "/compose.jsp"})
 public class AuthFilter implements Filter {
 
+    private final com.vanish.service.UserService userService = new com.vanish.service.impl.UserServiceImpl();
+
     @Override
     public void init(FilterConfig filterConfig) {
         // Initialization if needed
@@ -27,7 +29,12 @@ public class AuthFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
 
         HttpSession session = httpRequest.getSession(false);
-        boolean isLoggedIn = (session != null && session.getAttribute("user") != null);
+        com.vanish.model.User sessionUser = session == null ? null : (com.vanish.model.User) session.getAttribute("user");
+        boolean isLoggedIn = sessionUser != null;
+        if (isLoggedIn && userService.findByUsername(sessionUser.getUsername()) == null) {
+            session.invalidate(); // user was deleted
+            isLoggedIn = false;
+        }
 
         if (isLoggedIn) {
             chain.doFilter(request, response);
